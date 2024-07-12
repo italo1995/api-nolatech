@@ -1,5 +1,3 @@
-// import { IsEmail, IsNotEmpty, MinLength, IsOptional } from 'class-validator';
-
 export interface IUser {
   key: string;
   email: string;  user: string;
@@ -8,28 +6,8 @@ export interface IUser {
   password: string;
 }
 
-// export class UserValidation implements IUser {
-//   @IsOptional()
-//   key: string ='';
-
-//   @IsEmail()
-//   email: string ='';
-
-//   @IsNotEmpty()
-//   user: string ='';
-
-//   @IsNotEmpty()
-//   name: string ='';
-
-//   @IsOptional()
-//   lastName?: string | null;
-
-//   @IsNotEmpty()
-//   @MinLength(6)
-//   password: string ='';
-// }
-
 export type IUserCreationParams = Pick<IUser, "email" | "user" | "name" | "lastName" | "password">;
+export type IUserUpdateParams = Pick<IUser, "email" | "user" | "name" | "lastName">;
 export type IUserLogin = Pick<IUser, "email" | "password">;
 
 export interface IUserResponse extends Omit<IUser, 'password'> {

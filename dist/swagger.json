@@ -156,6 +156,32 @@
 			"IUserCreationParams": {
 				"$ref": "#/components/schemas/Pick_IUser.email-or-user-or-name-or-lastName-or-password_"
 			},
+			"Pick_IUser.email-or-user-or-name-or-lastName_": {
+				"properties": {
+					"email": {
+						"type": "string"
+					},
+					"user": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"lastName": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"email",
+					"user",
+					"name"
+				],
+				"type": "object",
+				"description": "From T, pick a set of properties whose keys are in the union K"
+			},
+			"IUserUpdateParams": {
+				"$ref": "#/components/schemas/Pick_IUser.email-or-user-or-name-or-lastName_"
+			},
 			"Pick_IUser.email-or-password_": {
 				"properties": {
 					"password": {
@@ -241,7 +267,7 @@
 						}
 					}
 				},
-				"summary": "Registrar un nuevo usuario.",
+				"summary": "Obtener todos los usuarios con paginación.",
 				"tags": [
 					"User"
 				],
@@ -296,17 +322,20 @@
 						"description": "Created"
 					}
 				},
+				"summary": "Crear un nuevo usuario.",
 				"tags": [
 					"User"
 				],
 				"security": [],
 				"parameters": [],
 				"requestBody": {
+					"description": "- Datos del nuevo usuario.",
 					"required": true,
 					"content": {
 						"application/json": {
 							"schema": {
-								"$ref": "#/components/schemas/IUserCreationParams"
+								"$ref": "#/components/schemas/IUserCreationParams",
+								"description": "- Datos del nuevo usuario."
 							}
 						}
 					}
@@ -322,24 +351,135 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"allOf": [
-										{
-											"$ref": "#/components/schemas/IUserResponse"
+									"properties": {
+										"data": {
+											"allOf": [
+												{
+													"$ref": "#/components/schemas/IUserResponse"
+												}
+											],
+											"nullable": true
 										}
+									},
+									"required": [
+										"data"
 									],
-									"nullable": true
+									"type": "object"
 								}
 							}
 						}
 					}
 				},
+				"summary": "Obtener un usuario por ID.",
 				"tags": [
 					"User"
 				],
 				"security": [],
 				"parameters": [
 					{
-						"in": "query",
+						"description": "- ID del usuario.",
+						"in": "path",
+						"name": "userId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			},
+			"patch": {
+				"operationId": "UpdateUser",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"properties": {
+										"status": {
+											"type": "boolean"
+										},
+										"data": {
+											"allOf": [
+												{
+													"$ref": "#/components/schemas/IUserResponse"
+												}
+											],
+											"nullable": true
+										}
+									},
+									"required": [
+										"status",
+										"data"
+									],
+									"type": "object"
+								}
+							}
+						}
+					}
+				},
+				"summary": "Actualizar un usuario por ID.",
+				"tags": [
+					"User"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"description": "- ID del usuario.",
+						"in": "path",
+						"name": "userId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"description": "- Datos actualizados del usuario.",
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/IUserUpdateParams",
+								"description": "- Datos actualizados del usuario."
+							}
+						}
+					}
+				}
+			}
+		},
+		"/v1/users/{key}": {
+			"delete": {
+				"operationId": "DeleteUser",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"properties": {
+										"status": {
+											"type": "boolean"
+										}
+									},
+									"required": [
+										"status"
+									],
+									"type": "object"
+								}
+							}
+						}
+					}
+				},
+				"summary": "Eliminar un usuario por ID.",
+				"tags": [
+					"User"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"description": "- ID del usuario.",
+						"in": "path",
 						"name": "key",
 						"required": true,
 						"schema": {

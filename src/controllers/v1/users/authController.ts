@@ -75,7 +75,7 @@ export class AuthController extends Controller {
       if (vUser) {
         const vPasswordIsValid = await argon2.verify(vUser.password, pRequestBody.password);
         if (vPasswordIsValid) {
-          const vUserResponse: IUserResponse = vUser
+          const { password, ...vUserResponse } = vUser;
           const vToken = jwt.sign(
             { key: vUserResponse.key, name: vUserResponse.name },
             AppConfig.JWT_SECRET_KEY as Secret
@@ -101,10 +101,7 @@ export class AuthController extends Controller {
   @SuccessResponse('201', 'User Found')
   public async me(@Request() pRequestBody: { auth: IUserResponse }): Promise<{ data: { user: IUserResponse | null }, status: boolean}>  {
     try {
-      console.log('pRequestBody :>> ', pRequestBody.auth);
-      console.log('pRequestBody.auth.key :>> ', pRequestBody.auth.key);
       const vUser: IUserResponse | null = await this.userService.get(pRequestBody.auth.key);
-      console.log('vUser :>> ', vUser);
       if (vUser) {
         this.setStatus(201); // HTTP 201 Created
         return  { data: { user: vUser }, status: true };

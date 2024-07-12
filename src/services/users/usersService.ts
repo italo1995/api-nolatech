@@ -1,10 +1,12 @@
 import FirebaseController, { CustomReference, Query } from "../../controllers/v1/FirebaseController";
-import { EOrder, IUser, IUserFilters, IUserResponse, IUserCreationParams } from "../../models/user/userModel";
-
+import { EOrder, IUser as IUserReponse, IUserFilters, IUserResponse, IUserCreationParams, IUserUpdateParams } from "../../models/user/userModel";
 
 interface IUserService {
-  all(pFilters: IUserFilters): Promise<IUser[]>
+  all(pFilters: IUserFilters): Promise<{ users: IUserReponse[], totalUsers: number, totalPages: number}>
   create(pNewUser: IUserCreationParams): Promise<IUserResponse | null>
+  get(pKey: string): Promise<IUserResponse | null>
+  update(pKey: string, pUpdatedUser: IUserCreationParams): Promise<IUserResponse | null>
+  delete(pKey: string): Promise<void>
 }
 
 class UserService implements IUserService {
@@ -14,44 +16,59 @@ class UserService implements IUserService {
     this.usersRef = firebaseController.db.ref('users')
   }
 
-  async all(pFilters: IUserFilters): Promise<IUser[]> {
+  async all(pFilters: IUserFilters): Promise<{ users: IUserReponse[], totalUsers: number, totalPages: number}> {
     try {
-      let query: Query = this.usersRef;
+      let vQuery: Query = this.usersRef;
       if (pFilters.name) {
-        query = query.orderByChild('name').equalTo(pFilters.name)
+        vQuery = vQuery.orderByChild('name').equalTo(pFilters.name)
       }
       if (pFilters.rolId) {
-        query = query.orderByChild('rolId').equalTo(pFilters.rolId)
+        vQuery = vQuery.orderByChild('rolId').equalTo(pFilters.rolId)
       }
       if (pFilters?.order) {
         if (pFilters.order === EOrder.NAME) {
-          query = query.orderByChild('name');
+          vQuery = vQuery.orderByChild('user');
         } else if (pFilters.order === EOrder.CREATED) {
-          query = query.orderByChild('created');
+          vQuery = vQuery.orderByChild('created');
         }
-      }
-
-      if (pFilters.page) {
-        const page = pFilters.page
-        const pageSize = pFilters.count || 12
-        const startAt = (page - 1) * pageSize
-        const snapshot = await query.limitToFirst(pageSize).startAt(startAt).once('value')
-        const users: IUser[] = [];
-        snapshot.forEach((childSnapshot) => {
-          const user = childSnapshot.val() as IUser
-          users.push(user)
-        });
-        return users
-
       } else {
-        const snapshot = await query.once('value')
-        const users: IUser[] = []
-        snapshot.forEach((childSnapshot) => {
-          const user = childSnapshot.val() as IUser
-          users.push(user)
-        });
-        return users
+        vQuery = vQuery.orderByChild('email');
       }
+
+      const vPageSize = pFilters.count || 12;
+      let vSnapshot;
+      let vTotalUsers = 0
+      let vTotalPages = 0
+      if (pFilters?.page && pFilters.page > 1) {
+        const vPage = pFilters.page;
+        const vPageSize = pFilters.count || 12;
+        const vStartAt = (vPage - 1) * vPageSize;
+        let vBeforeKey: string | null = null
+        const vSnapshotBefore = await vQuery.limitToFirst(vStartAt).once('value');
+        vSnapshotBefore.forEach((childSnapshot) => {
+          const vUser = childSnapshot.val()
+          vBeforeKey = vUser.email;
+        });
+        const vTotalSnapshot = await vQuery.once('value');
+        vTotalUsers = vTotalSnapshot.numChildren();
+        vTotalPages = Math.ceil(vTotalUsers / vPageSize);
+        vSnapshot = await vQuery.limitToFirst(vPageSize).startAfter(vBeforeKey).once('value');
+      } else {
+        vSnapshot = await vQuery.limitToFirst(vPageSize).once('value');
+      }
+
+      const vUsers: IUserReponse[] = [];
+      vSnapshot.forEach((childSnapshot) => {
+        const vUser = childSnapshot.val() as IUserReponse;
+        vUser.key = childSnapshot.key
+        vUsers.push(vUser);
+      });
+
+      return {
+        users: vUsers,
+        totalUsers: vTotalUsers,
+        totalPages: vTotalPages
+      };
     } catch (error) {
       throw error
     }
@@ -59,13 +76,12 @@ class UserService implements IUserService {
 
   public async get(pKey: string): Promise<IUserResponse | null> {
     try {
-      const snapshot = await this.usersRef.child(pKey).once('value');
-      if (snapshot.exists()) {
-        const userData = snapshot.val();
-        const user = {...userData, key: pKey};
-        console.log('user :>> ', user);
-        delete user.password
-        return user;
+      const vSnapshot = await this.usersRef.child(pKey).once('value');
+      if (vSnapshot.exists()) {
+        const vUserData = vSnapshot.val();
+        const vUser = {...vUserData, key: pKey};
+        delete vUser.password
+        return vUser;
       }
       return null;
     } catch (error) {
@@ -74,35 +90,53 @@ class UserService implements IUserService {
   }
 
   public async create(pNewUser: IUserCreationParams): Promise<IUserResponse | null> {
-    const userRef: CustomReference = await this.usersRef.push(pNewUser)
-    if (userRef?.key) {
-      const createdUser: IUserResponse = {
-        key: userRef?.key,
+    const vUserRef: CustomReference = await this.usersRef.push(pNewUser)
+    if (vUserRef?.key) {
+      const vCreatedUser: IUserResponse = {
+        key: vUserRef?.key,
         name: pNewUser.name,
         email: pNewUser.email,
         user: pNewUser?.user,
         lastName: pNewUser?.lastName,
       }
-      return createdUser;
+      return vCreatedUser;
     }
     return null
   }
 
-  public async verifyUser(email: string): Promise<IUser | null> {
+  public async update(pKey: string, pUpdatedUser: IUserUpdateParams): Promise<IUserResponse | null> {
     try {
-      const snapshotEmail = await this.usersRef.orderByChild('email').equalTo(email).once('value');
-      const snapshotName = await this.usersRef.orderByChild('user').equalTo(email).once('value');
-      let userData: any = null;
-      if (snapshotEmail.exists()) {
-        userData = snapshotEmail.val();
+      await this.usersRef.child(pKey).update(pUpdatedUser);
+      const vUpdatedUser = await this.get(pKey);
+      return vUpdatedUser;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  public async delete(pKey: string): Promise<void> {
+    try {
+      await this.usersRef.child(pKey).remove();
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  public async verifyUser(email: string): Promise<IUserReponse | null> {
+    try {
+      const vSnapshotEmail = await this.usersRef.orderByChild('email').equalTo(email).once('value');
+      const vSnapshotName = await this.usersRef.orderByChild('user').equalTo(email).once('value');
+      let vUserData: any = null;
+      if (vSnapshotEmail.exists()) {
+        vUserData = vSnapshotEmail.val();
       }
-      if (snapshotName.exists()) {
-        userData = snapshotName.val();
+      if (vSnapshotName.exists()) {
+        vUserData = vSnapshotName.val();
       }
-      if (userData) {
-        const userKey = Object.keys(userData)[0];
-        const user = {...userData[userKey], key: userKey};
-        return user;
+      if (vUserData) {
+        const vUserKey = Object.keys(vUserData)[0];
+        const vUser = {...vUserData[vUserKey], key: vUserKey};
+        return vUser;
       }
       return null;
     } catch (error) {
@@ -110,4 +144,5 @@ class UserService implements IUserService {
     }
   }
 }
-export default new UserService(FirebaseController)
+
+export default new UserService(FirebaseController);
